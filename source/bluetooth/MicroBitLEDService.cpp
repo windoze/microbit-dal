@@ -106,8 +106,7 @@ void MicroBitLEDService::onDataWritten(const GattWriteCallbackParams *params)
         // interrupt any animation that might be currently going on
         display.stopAnimation();
         for (int y=0; y<params->len; y++)
-             for (int x=0; x<5; x++)
-                 display.image.setPixelValue(x, y, data[y*5+x]);
+            display.image.setPixelValue(y%5, y/5, data[y*5+x]);
     }
 
     else if (params->handle == textCharacteristicHandle)
