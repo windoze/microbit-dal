@@ -37,6 +37,7 @@ DEALINGS IN THE SOFTWARE.
 // UUIDs for our service and characteristics
 extern const uint8_t  MicroBitLEDServiceUUID[];
 extern const uint8_t  MicroBitLEDServiceMatrixUUID[];
+extern const uint8_t  MicroBitLEDServiceGrayscaleMatrixUUID[];
 extern const uint8_t  MicroBitLEDServiceTextUUID[];
 extern const uint8_t  MicroBitLEDServiceScrollingSpeedUUID[];
 
@@ -75,16 +76,19 @@ class MicroBitLEDService
 
     // memory for our 8 bit control characteristics.
     uint8_t             matrixCharacteristicBuffer[5];
+    uint8_t             grayscaleMatrixCharacteristicBuffer[25];
     uint16_t            scrollingSpeedCharacteristicBuffer;
     uint8_t             textCharacteristicBuffer[MICROBIT_BLE_MAXIMUM_SCROLLTEXT];
 
     // Handles to access each characteristic when they are held by Soft Device.
     GattAttribute::Handle_t matrixCharacteristicHandle;
+    GattAttribute::Handle_t grayscaleMatrixCharacteristicHandle;
     GattAttribute::Handle_t textCharacteristicHandle;
     GattAttribute::Handle_t scrollingSpeedCharacteristicHandle;
 
     // We hold a copy of the GattCharacteristic, as mbed's BLE API requires this to provide read callbacks (pity!).
     GattCharacteristic  matrixCharacteristic;
+    GattCharacteristic  grayscaleMatrixCharacteristic;
 };
 
 

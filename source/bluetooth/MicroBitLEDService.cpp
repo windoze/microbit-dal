@@ -41,6 +41,8 @@ DEALINGS IN THE SOFTWARE.
 MicroBitLEDService::MicroBitLEDService(BLEDevice &_ble, MicroBitDisplay &_display) :
         ble(_ble), display(_display),
         matrixCharacteristic(MicroBitLEDServiceMatrixUUID, (uint8_t *)&matrixCharacteristicBuffer, 0, sizeof(matrixCharacteristicBuffer),
+    GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ),
+        grayscaleMatrixCharacteristic(MicroBitLEDServiceGrayscaleMatrixUUID, (uint8_t *)&grayscaleMatrixCharacteristicBuffer, 0, sizeof(grayscaleMatrixCharacteristicBuffer),
     GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ)
 {
     // Create the data structures that represent each of our characteristics in Soft Device.
@@ -52,27 +54,32 @@ MicroBitLEDService::MicroBitLEDService(BLEDevice &_ble, MicroBitDisplay &_displa
 
     // Initialise our characteristic values.
     memclr(matrixCharacteristicBuffer, sizeof(matrixCharacteristicBuffer));
+    memclr(grayscaleMatrixCharacteristicBuffer, sizeof(grayscaleMatrixCharacteristicBuffer));
     textCharacteristicBuffer[0] = 0;
     scrollingSpeedCharacteristicBuffer = MICROBIT_DEFAULT_SCROLL_SPEED;
 
     matrixCharacteristic.setReadAuthorizationCallback(this, &MicroBitLEDService::onDataRead);
+    grayscaleMatrixCharacteristic.setReadAuthorizationCallback(this, &MicroBitLEDService::onDataRead);
 
     // Set default security requirements
     matrixCharacteristic.requireSecurity(SecurityManager::MICROBIT_BLE_SECURITY_LEVEL);
+    grayscaleMatrixCharacteristic.requireSecurity(SecurityManager::MICROBIT_BLE_SECURITY_LEVEL);
     textCharacteristic.requireSecurity(SecurityManager::MICROBIT_BLE_SECURITY_LEVEL);
     scrollingSpeedCharacteristic.requireSecurity(SecurityManager::MICROBIT_BLE_SECURITY_LEVEL);
 
-    GattCharacteristic *characteristics[] = {&matrixCharacteristic, &textCharacteristic, &scrollingSpeedCharacteristic};
+    GattCharacteristic *characteristics[] = {&matrixCharacteristic, &grayscaleMatrixCharacteristic, &textCharacteristic, &scrollingSpeedCharacteristic};
     GattService         service(MicroBitLEDServiceUUID, characteristics, sizeof(characteristics) / sizeof(GattCharacteristic *));
 
     ble.addService(service);
 
     matrixCharacteristicHandle = matrixCharacteristic.getValueHandle();
+    grayscaleMatrixCharacteristicHandle = grayscaleMatrixCharacteristic.getValueHandle();
     textCharacteristicHandle = textCharacteristic.getValueHandle();
     scrollingSpeedCharacteristicHandle = scrollingSpeedCharacteristic.getValueHandle();
 
     ble.gattServer().write(scrollingSpeedCharacteristicHandle, (const uint8_t *)&scrollingSpeedCharacteristicBuffer, sizeof(scrollingSpeedCharacteristicBuffer));
     ble.gattServer().write(matrixCharacteristicHandle, (const uint8_t *)&matrixCharacteristicBuffer, sizeof(matrixCharacteristicBuffer));
+    ble.gattServer().write(grayscaleMatrixCharacteristicHandle, (const uint8_t *)&grayscaleMatrixCharacteristicBuffer, sizeof(grayscaleMatrixCharacteristicBuffer));
 
     ble.onDataWritten(this, &MicroBitLEDService::onDataWritten);
 }
@@ -92,6 +99,15 @@ void MicroBitLEDService::onDataWritten(const GattWriteCallbackParams *params)
        for (int y=0; y<params->len; y++)
             for (int x=0; x<5; x++)
                 display.image.setPixelValue(x, y, (data[y] & (0x01 << (4-x))) ? 255 : 0);
+    }
+
+    else if (params->handle == grayscaleMatrixCharacteristicHandle && params->len > 0 && params->len < 26)
+    {
+        // interrupt any animation that might be currently going on
+        display.stopAnimation();
+        for (int y=0; y<params->len; y++)
+             for (int x=0; x<5; x++)
+                 display.image.setPixelValue(x, y, data[y*5+x]);
     }
 
     else if (params->handle == textCharacteristicHandle)
@@ -134,7 +150,19 @@ void MicroBitLEDService::onDataRead(GattReadAuthCallbackParams *params)
         }
 
         ble.gattServer().write(matrixCharacteristicHandle, (const uint8_t *)&matrixCharacteristicBuffer, sizeof(matrixCharacteristicBuffer));
+    } else if (params->handle == grayscaleMatrixCharacteristicHandle)
+    {
+       for (int y=0; y<5; y++)
+       {
+           for (int x=0; x<5; x++)
+           {
+               grayscaleMatrixCharacteristicBuffer[y*5+x] = display.image.getPixelValue(x, y);
+           }
+       }
+
+       ble.gattServer().write(grayscaleMatrixCharacteristicHandle, (const uint8_t *)&grayscaleMatrixCharacteristicBuffer, sizeof(grayscaleMatrixCharacteristicBuffer));
     }
+
 }
 
 
@@ -144,6 +172,10 @@ const uint8_t  MicroBitLEDServiceUUID[] = {
 
 const uint8_t  MicroBitLEDServiceMatrixUUID[] = {
     0xe9,0x5d,0x7b,0x77,0x25,0x1d,0x47,0x0a,0xa0,0x62,0xfa,0x19,0x22,0xdf,0xa9,0xa8
+};
+
+const uint8_t  MicroBitLEDServiceGrayscaleMatrixUUID[] = {
+    0xe9,0x5d,0x7b,0x78,0x25,0x1d,0x47,0x0a,0xa0,0x62,0xfa,0x19,0x22,0xdf,0xa9,0xa8
 };
 
 const uint8_t  MicroBitLEDServiceTextUUID[] = {
